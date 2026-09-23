@@ -1,0 +1,65 @@
+# Build artifacts
+build/
+dist/
+__pycache__/
+*.pyc
+
+# Intermediate directories
+_mats*/
+_raw*/
+_premul*/
+_tread_tmp*/
+frames/
+_probe/
+_audit/
+_calib/
+_archive/
+_darkblue_work/
+_fresh_walk/
+
+# Debug files
+dbg_*
+debug_*
+_*.log
+*.log
+_*.txt
+_*.out
+_*.py
+_*.png
+_ben2_results/
+_test_*/
+_verify/
+_walk_check/
+_walk_sample/
+_compare*/
+
+# Video cache
+videos/*.mp4
+
+# Backup directories
+assets_backup_*/
+assets_after_*/
+backup_*/
+frames_backup/
+darkblue_refs/
+darkblue_refs_wide/
+dark_work_final/
+cutout_cache/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Keys
+keyhex.txt
+
+# Misc
+*.ico
+zoom_config.json
+
+# Large unused directories
+electron_pet/
+identity_candidates/
+
+# Backup (read-only)
+darkblue_refs_new/backup/

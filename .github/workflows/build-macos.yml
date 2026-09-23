@@ -1,0 +1,195 @@
+name: build-macos-dmg
+# Orange Cat Desktop Pet — macOS Universal2 DMG build
+# Based on golden_vest_pet CI
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Create isolated venv and install dependencies
+        run: |
+          python3 -m venv $HOME/build_env
+          $HOME/build_env/bin/pip install --upgrade pip
+          $HOME/build_env/bin/pip install PyQt5==5.15.10 pyinstaller==6.11.1 pyobjc-core==10.3 pyobjc-framework-Cocoa==10.3
+          echo "=== Installed packages ==="
+          $HOME/build_env/bin/pip list
+
+      - name: Generate .icns app icon
+        run: |
+          mkdir -p app.iconset
+          sips -z 16 16     icon.png --out app.iconset/icon_16x16.png
+          sips -z 32 32     icon.png --out app.iconset/icon_16x16@2x.png
+          sips -z 32 32     icon.png --out app.iconset/icon_32x32.png
+          sips -z 64 64     icon.png --out app.iconset/icon_32x32@2x.png
+          sips -z 128 128   icon.png --out app.iconset/icon_128x128.png
+          sips -z 256 256   icon.png --out app.iconset/icon_128x128@2x.png
+          sips -z 256 256   icon.png --out app.iconset/icon_256x256.png
+          sips -z 512 512   icon.png --out app.iconset/icon_512x512.png
+          sips -z 1024 1024 icon.png --out app.iconset/icon_512x512@2x.png
+          iconutil -c icns app.iconset -o app.icns
+
+      - name: Build .app bundle
+        run: |
+          set -o pipefail
+          echo "Architecture: $(uname -m)"
+          $HOME/build_env/bin/python -m PyInstaller --version
+          $HOME/build_env/bin/python -m PyInstaller OrangeCat_mac.spec --noconfirm --clean 2>&1 | tee pyinstaller.log
+          file "dist/OrangeCat.app/Contents/MacOS/OrangeCat" || true
+          # Check .app size — should be <80MB; if >150MB, heavy libs leaked in
+          du -sh "dist/OrangeCat.app" || true
+          echo "=== Top 20 largest files in .app ==="
+          find dist/OrangeCat.app -type f -print0 | xargs -0 ls -lS 2>/dev/null | sort -rn -k5 | head -20 || true
+          echo "=== Large binaries (>5MB) ==="
+          find dist/OrangeCat.app \( -name '*.so' -o -name '*.dylib' \) -print0 | xargs -0 stat -f '%z %N' 2>/dev/null | while read size path; do
+            if [ "$size" -gt 5000000 ]; then
+              echo "WARN: Large binary ($((size/1024/1024))MB): $path"
+            fi
+          done || true
+
+      - name: Push build log on failure
+        if: failure()
+        run: |
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
+          git checkout -B ci-logs-OrangeCat-${{ matrix.arch }}
+          git add -f pyinstaller.log
+          git commit -m "CI: build failure log (${{ matrix.arch }})" || true
+          git push -f origin ci-logs-OrangeCat-${{ matrix.arch }} || true
+
+      - name: Ad-hoc codesign each arch
+        run: |
+          codesign --force --deep --sign - --options runtime --entitlements entitlements.mac.plist "dist/OrangeCat.app"
+          codesign -dv "dist/OrangeCat.app" 2>&1 | head -5
+
+      - name: Upload .app artifact
+        run: |
+          export COPYFILE_DISABLE=1
+          mv "dist/OrangeCat.app" "dist/${{ matrix.arch }}.app"
+          tar -cf "app-${{ matrix.arch }}.tar" -C dist "${{ matrix.arch }}.app"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pet-macos-app-${{ matrix.arch }}
+          path: "app-${{ matrix.arch }}.tar"
+          retention-days: 30
+
+  merge:
+    needs: build
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download both arch .app artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pet-macos-app-*
+          merge-multiple: true
+          path: apps
+
+      - name: Extract tarballs to .app
+        run: |
+          cd apps
+          ls -la
+          export COPYFILE_DISABLE=1
+          tar -xf app-arm64.tar && rm app-arm64.tar
+          tar -xf app-x86_64.tar && rm app-x86_64.tar
+          ls -la
+          echo "--- symlink spot check ---"
+          find arm64.app -type l | head -5
+
+      - name: lipo merge to Universal2
+        run: |
+          ls apps/
+          bash merge_universal.sh apps/arm64.app apps/x86_64.app "OrangeCat.app" || true
+          # Verify merge ourselves (merge_universal.sh's find can fail on CI)
+          MAIN="OrangeCat.app/Contents/MacOS/OrangeCat"
+          if [ -f "$MAIN" ]; then
+            ARCHS=$(lipo -archs "$MAIN")
+            echo "Main executable: $ARCHS"
+            echo "$ARCHS" | grep -q "arm64" && echo "$ARCHS" | grep -q "x86_64" && echo "OK: Universal2" || { echo "FAIL: not Universal2"; exit 1; }
+          else
+            echo "FAIL: main executable not found"
+            exit 1
+          fi
+
+      - name: Ad-hoc codesign after lipo merge
+        run: |
+          codesign --force --deep --sign - --options runtime --entitlements entitlements.mac.plist "OrangeCat.app"
+          codesign -dv "OrangeCat.app" 2>&1 | head -5
+          codesign --verify --deep --strict "OrangeCat.app" && echo "Signature OK"
+          codesign -d --entitlements - "OrangeCat.app" 2>&1 | head -20
+
+      - name: Create DMG with styled drag-to-Applications layout
+        run: |
+          pip install dmgbuild Pillow
+          python make_dmg.py OrangeCat.app OrangeCat.dmg
+
+      - name: Verify DMG
+        run: |
+          hdiutil verify "OrangeCat.dmg"
+          ls -lh *.dmg
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pet-macos-dmg-universal
+          path: "OrangeCat.dmg"
+          retention-days: 30
+
+      - name: Cleanup previous releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete OrangeCat-v1-macos-universal --yes --cleanup-tag 2>/dev/null || true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "OrangeCat-v1-macos-universal"
+          name: "OrangeCat v1 (macOS Universal — Apple Silicon & Intel)"
+          body: |
+            OrangeCat for macOS (Universal2 — works on both Apple Silicon M1/M2/M3/M4 and Intel Macs).
+
+            **How to install:**
+            1. Double-click the DMG to open it
+            2. Drag OrangeCat.app to the Applications folder
+            3. Close the DMG window
+            4. Open Terminal, run this ONE-TIME command to remove macOS download quarantine:
+               ```
+               xattr -cr /Applications/OrangeCat.app
+               ```
+            5. Double-click /Applications/OrangeCat.app to launch!
+
+            **Why step 4?** macOS quarantines apps downloaded from the internet.
+            Running `xattr -cr` once removes the quarantine flag, so the app
+            launches instantly on every future start — no more "verifying" delay.
+
+            **Alternative (no Terminal):** Right-click the app → choose "Open" → click "Open" in the dialog.
+            This also removes quarantine but only works on first launch.
+          files: "OrangeCat.dmg"
