@@ -1554,7 +1554,8 @@ class PetWindow(QWidget):
         self._sound.load_volume()
         self._sound.preload_all()
         # Startup greeting: play a short meow on first appear (independent of idle probability)
-        QTimer.singleShot(300, lambda: self._sound._do_play('meow', 'happy_trill.wav', 0.65, False))
+        _greet_path = os.path.join(self._sound.SOUNDS_DIR, 'happy_meow.wav')
+        QTimer.singleShot(300, lambda: self._sound._do_play('happy', _greet_path, 0.65, False))
         # Windows native extended style: pet window no activation, no focus stealing (Tool-like behavior without Tool's disappear bug)
         if sys.platform == 'win32':
             try:
@@ -2748,7 +2749,6 @@ class PetWindow(QWidget):
         trick_menu.add_item('roll', 'Roll Over')
         trick_menu.add_item('dance', 'Dance')
         trick_menu.add_item('meow', 'Meow')
-        trick_menu.add_item('lick', 'Lick Fur')
         trick_menu.add_item('groom', 'Groom')
         trick_menu.add_item('beg', 'Beg')
         trick_menu.add_item('bath', 'Bath')
@@ -2816,8 +2816,6 @@ class PetWindow(QWidget):
             self.set_state('dance', duration=15.24)
         elif action == 'meow':
             self.set_state('meow', duration=10.16)
-        elif action == 'lick':
-            self.set_state('lick', duration=10.16)
         elif action == 'beg':
             self.set_state('beg', duration=10.16)
         elif action == 'bath':
@@ -3069,7 +3067,8 @@ def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     _pet_window = PetWindow()
-    sys.exit(app.exec_())
+    ret = app.exec_()
+    sys.exit(ret)
 
 
 if __name__ == '__main__':

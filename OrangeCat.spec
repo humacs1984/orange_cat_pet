@@ -8,8 +8,9 @@ a = Analysis(
     binaries=[],
     datas=[
         ('assets', 'assets'),
-        # sounds: only WAV files + config JSON; exclude source/ and processed/ intermediates
+        # sounds: 16 source WAVs + 8 pre-rendered variants + config JSON
         ('sounds/*.wav', 'sounds'),
+        ('sounds/variants', 'sounds/variants'),
         ('sounds/config', 'sounds/config'),
         ('icon.png', '.'),
         # Qt5 platform plugin — required for PyQt5 on Windows

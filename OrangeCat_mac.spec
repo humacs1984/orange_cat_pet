@@ -7,6 +7,7 @@ a = Analysis(
     binaries=[],
     datas=[('assets', 'assets'),
            ('sounds/*.wav', 'sounds'),
+           ('sounds/variants', 'sounds/variants'),
            ('sounds/config', 'sounds/config'),
            ('icon.png', '.')],
     hiddenimports=['PyQt5.QtWidgets', 'PyQt5.QtCore', 'PyQt5.QtGui',
