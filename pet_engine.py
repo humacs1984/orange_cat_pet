@@ -111,8 +111,12 @@ ZOOM_MIN, ZOOM_MAX, ZOOM_STEP = 0.5, 2.5, 0.25
 
 
 def zoom_cfg_path():
-    """Zoom config file location (next to exe after packaging)"""
+    """Zoom config file location (writable; macOS uses Application Support, Windows uses exe dir)"""
     if getattr(sys, 'frozen', False):
+        if sys.platform == 'darwin':
+            _support = os.path.expanduser('~/Library/Application Support/OrangeCat')
+            os.makedirs(_support, exist_ok=True)
+            return os.path.join(_support, 'zoom_config.json')
         return os.path.join(os.path.dirname(sys.executable), 'zoom_config.json')
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'zoom_config.json')
 
@@ -262,10 +266,15 @@ class RoundedMenu(QWidget):
         eventFilter can't catch clicks that land on the Windows desktop (no Qt widget there).
         Uses Win32 GetAsyncKeyState because QApplication.mouseButtons() may not update
         inside a modal QEventLoop for clicks outside Qt windows."""
-        import ctypes
-        # VK_LBUTTON = 1; GetAsyncKeyState returns <0 if key is down
-        if ctypes.windll.user32.GetAsyncKeyState(1) >= 0:
-            return
+        if sys.platform == 'win32':
+            import ctypes
+            # VK_LBUTTON = 1; GetAsyncKeyState returns <0 if key is down
+            if ctypes.windll.user32.GetAsyncKeyState(1) >= 0:
+                return
+        else:
+            # macOS: use Qt mouseButtons check instead
+            if not QApplication.mouseButtons() & Qt.LeftButton:
+                return
         gp = QCursor.pos()
         # Check if click is inside main menu
         if self.geometry().contains(gp):
@@ -423,16 +432,24 @@ _BODY_BOTTOM_CACHE = {}   # v66: cacheKey -> bottom row (pixel scan result cache
 _BODY_BOTTOM_CACHE2 = {}  # v66: cacheKey -> content bottom row (lift scan cache)
 
 
+def _writable_log_path(filename):
+    """Get a writable path for log/config files. macOS .app bundle is read-only."""
+    if getattr(sys, 'frozen', False):
+        if sys.platform == 'darwin':
+            _support = os.path.expanduser('~/Library/Application Support/OrangeCat')
+            os.makedirs(_support, exist_ok=True)
+            return os.path.join(_support, filename)
+        return os.path.join(os.path.dirname(sys.executable), filename)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+
+
 def _crash_log(tag):
     """v69-fix: QThread uncaught exception triggers C++ std::terminate  --  no traceback/no event log/
     no crash.log, process dies silently (cause of "auto-closes after action"). This function is for thread run()
     fallback except to write log, degrading death to "action blank but process alive"."""
     import traceback
     try:
-        if getattr(sys, 'frozen', False):
-            log = os.path.join(os.path.dirname(sys.executable), 'crash.log')
-        else:
-            log = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'crash.log')
+        log = _writable_log_path('crash.log')
         with open(log, 'a', encoding='utf-8') as f:
             f.write(time.strftime('%Y-%m-%d %H:%M:%S ') + tag + '\n'
                     + traceback.format_exc() + '\n')
@@ -970,7 +987,7 @@ class SpriteBank:
             ref_h_val = (state_meta or {}).get('ref_height', frame_h)
             # v119: Uniform height scale — same as image scaling
             sc_lift = draw / float(ref_h_val) if ref_h_val > 0 else 1.0
-            bottoms = [max(0, min(int(round(b * sc_lift)), img_h - 1)) 
+            bottoms = [max(0, min(int(round(b * sc_lift)), img_h - 1))
                        for b, img_h in zip(body_bottoms_raw, [im.height() for im in imgs])]
         else:
             # Legacy runtime scan path
@@ -1226,21 +1243,19 @@ class SpriteBank:
 
     def _trim_pixmaps(self, state, idx):
         """v114: Release pixmaps outside [idx-PM_WINDOW/2, idx+PM_WINDOW/2] to free GPU VRAM.
-        Called from get() after caching current frame. Safe because disk cache has Q95 backup."""
+        Called from get() after caching current frame. Safe because disk cache has Q95 backup.
+        v121-fix: Bounds-check both normal and mirrored pixmap lists independently."""
         pm_cache = self.pixmaps.get(state)
-        if not pm_cache:
-            return
-        n = len(pm_cache)
-        half = self.PM_WINDOW // 2
-        lo = max(0, idx - half)
-        hi = min(n, idx + half + 1)
-        released = 0
-        for j in range(n):
-            if j < lo or j >= hi:
-                if pm_cache[j] is not None:
-                    pm_cache[j] = None
-                    released += 1
-        # Also trim mirrored pixmaps
+        if pm_cache:
+            n = len(pm_cache)
+            half = self.PM_WINDOW // 2
+            lo = max(0, idx - half)
+            hi = min(n, idx + half + 1)
+            for j in range(n):
+                if j < lo or j >= hi:
+                    if pm_cache[j] is not None:
+                        pm_cache[j] = None
+        # Also trim mirrored pixmaps — list length may differ during incremental load
         pm_m_cache = self.pixmaps_m.get(state)
         if pm_m_cache:
             n_m = len(pm_m_cache)
@@ -1251,8 +1266,6 @@ class SpriteBank:
                 if j < lo_m or j >= hi_m:
                     if pm_m_cache[j] is not None:
                         pm_m_cache[j] = None
-                        released += 1
-        return released
 
     def get(self, state, idx, flipped):
         state = self.alias.get(state, state)   # v64: Alias resolution (potty->sit), lazy-owner safe
@@ -1260,17 +1273,6 @@ class SpriteBank:
         if not bank:
             return QPixmap()           # v64 lazy-load incomplete -> empty pixmap skip draw
         i = idx % len(bank) if bank else 0
-        # DIAG: check PROP_STATES eye on 2nd+ loop (i wraps back)
-        if state in ('bath','eat','type') and i == 0:
-            f0 = bank[0]
-            if f0 is not None and f0.format() == 6:  # ARGB32_Premultiplied
-                ptr = f0.constBits()
-                ptr.setsize(f0.byteCount())
-                import numpy as _np
-                _a = _np.frombuffer(bytes(ptr), dtype=_np.uint8).reshape(f0.height(), f0.bytesPerLine()//4, 4)[:f0.height(),:f0.width(),]
-                _dark = int(((_a[:,:,3]>30)&(_a[:,:,0]<60)&(_a[:,:,1]<60)&(_a[:,:,2]<60)).sum())
-                _fg = int((_a[:,:,3]>0).sum())
-                print(f'DIAG get({state},0) fg={_fg} dark={_dark} id={id(f0)}', flush=True)
         # v115: QImage resident + Pixmap sliding window — frames[] never released.
         # QPixmap cache is a sliding window (PM_WINDOW frames), rebuilt from QImage on miss.
         if not flipped:
@@ -1551,6 +1553,8 @@ class PetWindow(QWidget):
         self._sound = SoundManager(parent=self)
         self._sound.load_volume()
         self._sound.preload_all()
+        # Startup greeting: play a short meow on first appear (independent of idle probability)
+        QTimer.singleShot(300, lambda: self._sound._do_play('meow', 'happy_trill.wav', 0.65, False))
         # Windows native extended style: pet window no activation, no focus stealing (Tool-like behavior without Tool's disappear bug)
         if sys.platform == 'win32':
             try:
@@ -2438,6 +2442,22 @@ class PetWindow(QWidget):
 
     # ---------- Drawing (core: hybrid rendering) ----------
     def paintEvent(self, event):
+        try:
+            self._paintEvent_inner(event)
+        except Exception as _e:
+            import traceback
+            traceback.print_exc()
+            # Write crash info
+            try:
+                _clog = _writable_log_path('crash.log')
+                with open(_clog, 'a', encoding='utf-8') as _f:
+                    _f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S")}\n')
+                    traceback.print_exc(file=_f)
+                    _f.write('\n')
+            except Exception:
+                pass
+
+    def _paintEvent_inner(self, event):
         painter = QPainter(self)
         # v117: Clear entire widget to transparent EVERY frame.
         # macOS layer-backed windows do NOT auto-clear the backing store between
@@ -2700,6 +2720,15 @@ class PetWindow(QWidget):
         self.happiness = min(100, self.happiness + 6)
 
     def contextMenuEvent(self, event):
+        try:
+            self._contextMenuEvent_inner(event)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+        finally:
+            self._menu_open = False
+
+    def _contextMenuEvent_inner(self, event):
         # v110: Prevent multiple menus — fast right-clicks could spawn overlapping menus
         if getattr(self, '_menu_open', False):
             return
@@ -2844,10 +2873,10 @@ class PetWindow(QWidget):
             self.set_zoom(ZOOM_DEFAULT)
             self.say('Reset to default size')
         elif action == 'sound_up':
-            self._sound.set_volume(self._sound.volume + SoundManager.VOLUME_STEP)
+            self._sound.set_volume(self._sound.volume + self._sound.VOLUME_STEP)
             self.say(f'🔊 {int(self._sound.volume * 100)}%')
         elif action == 'sound_down':
-            self._sound.set_volume(self._sound.volume - SoundManager.VOLUME_STEP)
+            self._sound.set_volume(self._sound.volume - self._sound.VOLUME_STEP)
             self.say(f'🔉 {int(self._sound.volume * 100)}%')
         elif action == 'sound_mute':
             muted = self._sound.toggle_mute()
@@ -2869,10 +2898,7 @@ def _install_excepthook():
     def hook(exc_type, exc_value, exc_tb):
         text = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
         try:
-            if getattr(sys, 'frozen', False):
-                log = os.path.join(os.path.dirname(sys.executable), 'crash.log')
-            else:
-                log = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'crash.log')
+            log = _writable_log_path('crash.log')
             with open(log, 'a', encoding='utf-8') as f:
                 f.write(time.strftime('%Y-%m-%d %H:%M:%S\n') + text + '\n')
         except Exception:
@@ -2903,7 +2929,9 @@ def _acquire_single_instance():
 
 def _find_existing_window():
     """Enumerate top-level windows to find pet window: prefer exact title, then match historical version title prefix.
-    (Old version EXE window title was set by PyInstaller from EXE name "Orange Cat Desktop Pet vN")"""
+    Windows-only; macOS returns 0 (no single-instance detection via window enumeration)."""
+    if sys.platform != 'win32':
+        return 0
     import ctypes
     import ctypes.wintypes as wt
     user32 = ctypes.windll.user32
@@ -2955,7 +2983,10 @@ def _activate_existing_instance():
 
 def _is_window_responsive(hwnd, timeout_ms=1500):
     """v66-fix: Use SendMessageTimeout(SMTO_ABORTIFHUNG) to probe old instance message queue liveness.
-    If old instance event loop is frozen (zombie), call fails immediately without blocking this process."""
+    If old instance event loop is frozen (zombie), call fails immediately without blocking this process.
+    Windows-only; macOS always returns True (no zombie detection needed)."""
+    if sys.platform != 'win32':
+        return True
     import ctypes
     SMTO_ABORTIFHUNG = 0x0002
     result = ctypes.c_long()
@@ -2965,7 +2996,10 @@ def _is_window_responsive(hwnd, timeout_ms=1500):
 
 
 def _kill_process_of_hwnd(hwnd):
-    """v66-fix: Terminate zombie old instance process (release singleton lock), don't touch this process"""
+    """v66-fix: Terminate zombie old instance process (release singleton lock), don't touch this process.
+    Windows-only; macOS does nothing (no zombie scenario)."""
+    if sys.platform != 'win32':
+        return False
     import ctypes
     pid = ctypes.c_ulong()
     ctypes.windll.user32.GetWindowThreadProcessId(int(hwnd), ctypes.byref(pid))
@@ -2984,12 +3018,13 @@ def _kill_process_of_hwnd(hwnd):
 def _release_singleton_mutex():
     """v66-fix: Close this process's mutex handle.
     Kernel mutex object destroyed only after all handles closed  --  if don't close own first handle,
-    after killing old process second CreateMutexW still returns ALREADY_EXISTS (false takeover failure)."""
+    after killing old process second CreateMutexW still returns ALREADY_EXISTS (false takeover failure).
+    Windows-only; macOS has no singleton mutex."""
     global _singleton_mutex
-    if _singleton_mutex:
+    if _singleton_mutex and sys.platform == 'win32':
         import ctypes
         ctypes.windll.kernel32.CloseHandle(_singleton_mutex)
-        _singleton_mutex = None
+    _singleton_mutex = None
 
 
 def main():
@@ -3001,12 +3036,8 @@ def main():
     global _crash_fh
     try:
         import faulthandler
-        if getattr(sys, 'frozen', False):
-            _crash_fh = open(os.path.join(os.path.dirname(sys.executable), 'crash.log'),
-                             'a', encoding='utf-8')
-        else:
-            _crash_fh = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'crash.log'),
-                             'a', encoding='utf-8')
+        _crash_path = _writable_log_path('crash.log')
+        _crash_fh = open(_crash_path, 'a', encoding='utf-8')
         faulthandler.enable(file=_crash_fh, all_threads=True)
     except Exception:
         _crash_fh = None

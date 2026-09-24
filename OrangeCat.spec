@@ -8,7 +8,9 @@ a = Analysis(
     binaries=[],
     datas=[
         ('assets', 'assets'),
-        ('sounds', 'sounds'),
+        # sounds: only WAV files + config JSON; exclude source/ and processed/ intermediates
+        ('sounds/*.wav', 'sounds'),
+        ('sounds/config', 'sounds/config'),
         ('icon.png', '.'),
         # Qt5 platform plugin — required for PyQt5 on Windows
         ('C:/Users/humac/anaconda3/Library/plugins/platforms', 'PyQt5/Qt5/plugins/platforms'),
@@ -30,7 +32,8 @@ a = Analysis(
         'sympy', 'networkx',
         # Qt modules not used by pet (only Core+Gui+Widgets+Multimedia needed)
         'PyQt5.QtPdf', 'PyQt5.QtQuick', 'PyQt5.QtQml',
-        'PyQt5.QtNetwork', 'PyQt5.QtVirtualKeyboard',
+        # QtNetwork kept — QtMultimedia depends on it
+        'PyQt5.QtVirtualKeyboard',
         'PyQt5.QtWebEngine', 'PyQt5.QtWebEngineCore',
         'PyQt5.QtWebEngineWidgets', 'PyQt5.QtWebKit',
         'PyQt5.QtXml', 'PyQt5.QtSvg', 'PyQt5.QtSql',

@@ -1,0 +1,269 @@
+{
+  "_meta": {
+    "version": "1.1",
+    "description": "OrangeCat Desktop Pet sound configuration — 20 actions mapped from 16 source audio files",
+    "style": "Cute, Friendly, Playful, Soft, Non-annoying"
+  },
+
+  "bath": {
+    "sound_pool": [{"file": "bath.wav", "weight": 100}],
+    "volume": 0.65,
+    "volume_variation": 0.05,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.3,
+    "loop": true,
+    "fade_in": 0.1,
+    "fade_out": 0.2,
+    "secondary_pool": [{"file": "soft_meow_pool.wav", "weight": 100}],
+    "secondary_probability": 0.15,
+    "secondary_volume": 0.45,
+    "secondary_cooldown": 10.0
+  },
+
+  "beg": {
+    "sound_pool": [{"file": "beg.wav", "weight": 100}],
+    "volume": 0.85,
+    "volume_variation": 0.03,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.2,
+    "loop": true,
+    "fade_in": 0.05,
+    "fade_out": 0.15
+  },
+
+  "dance": {
+    "sound_pool": [{"file": "dance.wav", "weight": 100}],
+    "volume": 0.75,
+    "volume_variation": 0.05,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.1,
+    "loop": true,
+    "fade_in": 0.05,
+    "fade_out": 0.1
+  },
+
+  "eat": {
+    "sound_pool": [{"file": "eat.wav", "weight": 100}],
+    "volume": 0.70,
+    "volume_variation": 0.04,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.5,
+    "loop": true,
+    "fade_in": 0.1,
+    "fade_out": 0.15
+  },
+
+  "groom": {
+    "sound_pool": [{"file": "groom.wav", "weight": 100}],
+    "volume": 0.60,
+    "volume_variation": 0.04,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.3,
+    "loop": true,
+    "fade_in": 0.08,
+    "fade_out": 0.15
+  },
+
+  "happy": {
+    "sound_pool": [
+      {"file": "happy.wav", "weight": 40},
+      {"file": "happy_trill.wav", "weight": 40},
+      {"file": "happy_chirp.wav", "weight": 20}
+    ],
+    "volume": 0.80,
+    "volume_variation": 0.05,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.0,
+    "loop": false,
+    "fade_in": 0.0,
+    "fade_out": 0.05
+  },
+
+  "idle": {
+    "sound_pool": [{"file": "idle.wav", "weight": 100}],
+    "volume": 0.45,
+    "volume_variation": 0.05,
+    "probability": 0.06,
+    "cooldown": 30.0,
+    "delay": 0.0,
+    "loop": false,
+    "fade_in": 0.05,
+    "fade_out": 0.1
+  },
+
+  "meow": {
+    "sound_pool": [
+      {"file": "meow.wav", "weight": 60},
+      {"file": "soft_meow_pool.wav", "weight": 25},
+      {"file": "attention_meow.wav", "weight": 15}
+    ],
+    "volume": 0.85,
+    "volume_variation": 0.05,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.0,
+    "loop": true,
+    "fade_in": 0.02,
+    "fade_out": 0.1
+  },
+
+  "play_dead": {
+    "sound_pool": [],
+    "volume": 0.0,
+    "probability": 0.0,
+    "cooldown": 0,
+    "delay": 0.0,
+    "loop": false,
+    "fade_in": 0.0,
+    "fade_out": 0.0
+  },
+
+  "purr": {
+    "sound_pool": [{"file": "purr.wav", "weight": 100}],
+    "volume": 0.60,
+    "volume_variation": 0.08,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.1,
+    "loop": true,
+    "fade_in": 0.3,
+    "fade_out": 0.5
+  },
+
+  "roll": {
+    "sound_pool": [
+      {"file": "roll.wav", "weight": 60},
+      {"file": "normal_trill.wav", "weight": 25},
+      {"file": "happy_chirp.wav", "weight": 15}
+    ],
+    "volume": 0.55,
+    "volume_variation": 0.05,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.1,
+    "loop": false,
+    "fade_in": 0.02,
+    "fade_out": 0.08
+  },
+
+  "run": {
+    "sound_pool": [{"file": "run.wav", "weight": 100}],
+    "volume": 0.25,
+    "volume_variation": 0.05,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.0,
+    "loop": true,
+    "fade_in": 0.05,
+    "fade_out": 0.15
+  },
+
+  "scratch": {
+    "sound_pool": [{"file": "scratch.wav", "weight": 100}],
+    "volume": 0.70,
+    "volume_variation": 0.05,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.4,
+    "loop": true,
+    "fade_in": 0.05,
+    "fade_out": 0.1
+  },
+
+  "sit": {
+    "sound_pool": [{"file": "sit.wav", "weight": 100}],
+    "volume": 0.35,
+    "volume_variation": 0.05,
+    "probability": 0.05,
+    "cooldown": 20.0,
+    "delay": 0.5,
+    "loop": false,
+    "fade_in": 0.05,
+    "fade_out": 0.1
+  },
+
+  "sleep": {
+    "sound_pool": [{"file": "sleep.wav", "weight": 100}],
+    "volume": 0.32,
+    "volume_variation": 0.08,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.5,
+    "loop": true,
+    "fade_in": 0.5,
+    "fade_out": 0.8
+  },
+
+  "stretch": {
+    "sound_pool": [
+      {"file": "stretch.wav", "weight": 70},
+      {"file": "soft_meow_pool.wav", "weight": 30}
+    ],
+    "volume": 0.55,
+    "volume_variation": 0.05,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.2,
+    "loop": false,
+    "fade_in": 0.02,
+    "fade_out": 0.08
+  },
+
+  "surprised": {
+    "sound_pool": [{"file": "surprised.wav", "weight": 100}],
+    "volume": 0.80,
+    "volume_variation": 0.03,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.0,
+    "loop": false,
+    "fade_in": 0.0,
+    "fade_out": 0.05
+  },
+
+  "type": {
+    "sound_pool": [{"file": "type.wav", "weight": 100}],
+    "volume": 0.52,
+    "volume_variation": 0.06,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.3,
+    "loop": true,
+    "fade_in": 0.05,
+    "fade_out": 0.1
+  },
+
+  "walk": {
+    "sound_pool": [{"file": "walk.wav", "weight": 100}],
+    "volume": 0.15,
+    "volume_variation": 0.03,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.0,
+    "loop": true,
+    "fade_in": 0.1,
+    "fade_out": 0.3
+  },
+
+  "wave": {
+    "sound_pool": [
+      {"file": "wave.wav", "weight": 60},
+      {"file": "normal_trill.wav", "weight": 25},
+      {"file": "happy_trill.wav", "weight": 15}
+    ],
+    "volume": 0.70,
+    "volume_variation": 0.05,
+    "probability": 1.0,
+    "cooldown": 0,
+    "delay": 0.1,
+    "loop": false,
+    "fade_in": 0.02,
+    "fade_out": 0.08
+  }
+}
